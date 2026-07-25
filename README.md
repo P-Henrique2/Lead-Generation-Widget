@@ -1,18 +1,31 @@
-# Environment-and-AI-toolchain
+# Lead Generation Widget
 
-**FE-01** — Assignment project for the Front-end AI Engineering track.
+Front-end AI Engineering track assignment. A lead capture widget app built with Next.js, 
+using Firebase/Firestore for data storage, developed with AI-assisted tooling (GitHub Copilot).
 
-This repo documents my toolchain setup and AI-assisted development workflow.
+**Live preview:** [LeadGenWidget](https://lead-geneapp.vercel.app/)
 
 ## About
 
-This assignment establishes a reproducible local development environment and records how AI-assisted tools fit into front-end engineering work. The goal is not just to install software, but to capture *why* each tool is used and how it supports the workflow.
+This repo documents both the built application and the AI-assisted development workflow 
+used to build it — including prompts used, manual corrections made to AI-generated code, 
+and architectural decisions.
 
-## Planned stack
+## Stack
 
-- **Framework:** Next.js (App Router)
-- **Language:** TypeScript
-- **Styling:** Tailwind CSS
-- **Package manager:** npm
+- Framework: Next.js (App Router)
+- Language: TypeScript
+- Styling: Tailwind CSS
+- Package manager: npm
+- Backend: Firebase (Firestore + Admin SDK for server-side reads)
 
-Assignment project for the Front-end AI Engineering track. This repo documents my toolchain setup and AI-assisted development workflow.
+## Screens
+
+- `/` — Home
+- `/widget` — Lead capture form
+- `/leads` — Leads dashboard
+- `/leads/[id]` — Lead detail
+- `/settings` — Widget configuration
+- `/health` — Health check (live Firestore read via server-only Admin SDK)
+
+See `SPEC.md` for the full spec and `claude.md` for project conventions.
