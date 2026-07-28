@@ -16,6 +16,9 @@ export default function HomePage() {
           <Link href="/health" className="rounded-full border border-slate-700 px-5 py-3 font-medium text-slate-200">
             Check health
           </Link>
+          <Link href="/playground/modal" className="rounded-full border border-cyan-500/40 px-5 py-3 font-medium text-cyan-300">
+            Test modal
+          </Link>
         </div>
       </div>
     </section>
