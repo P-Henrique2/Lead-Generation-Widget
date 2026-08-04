@@ -29,3 +29,34 @@ and architectural decisions.
 - `/health` — Health check (live Firestore read via server-only Admin SDK)
 
 See `SPEC.md` for the full spec and `claude.md` for project conventions.
+
+## Tool: scoreLead
+
+**Purpose:** Scores lead fit during the qualification chat.
+
+**Input schema:**
+- `teamSize`: "1-5" | "6-20" | "21-50" | "50+"
+- `timeline`: "this month" | "this quarter" | "exploring"
+- `isDecisionMaker`: boolean
+
+**Returns:** `{ score: number (0-100), tier: "hot" | "warm" | "cold", reasoning: string }`
+
+**Side effect:** writes the scored lead to Firestore. If this write fails, the tool
+throws, surfacing as the tool's `output-error` state in the UI.
+
+**To trigger the error state for review:** disconnect network, or temporarily
+revoke Firestore write access, then continue the qualifying conversation.
+
+## Tool: saveLead
+
+**Purpose:** Human-in-the-loop confirmation before a scored lead is persisted
+for follow-up. No server `execute` is required; the client confirms or denies via
+`addToolResult`.
+
+**Input schema:**
+- `reason`: optional string describing why the lead should be saved
+
+**Return shape:**
+- `confirmed: boolean`
+- The tool becomes an `output-available` part once the client responds with a
+  confirm or deny action.

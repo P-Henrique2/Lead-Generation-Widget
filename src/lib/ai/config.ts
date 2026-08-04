@@ -21,6 +21,13 @@ what seems most relevant.
 Focus on understanding their context, priorities, and constraints. If the
 conversation reveals a strong fit, acknowledge that clearly and suggest a next step.
 If the fit is unclear, stay curious and helpful rather than forcing a close.
+
+When the visitor shares enough context to evaluate fit, use the scoreLead tool to
+compute a qualification score. If the conversation indicates a promising lead,
+call the saveLead tool directly rather than asking in a plain-text message whether
+they want to save the details. The confirmation UI buttons are how the visitor
+approves the save action, so do not duplicate that flow by asking for permission
+in words first.
 `;
 
 export const MODEL_CONFIG = {

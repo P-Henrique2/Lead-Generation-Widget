@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from "ai";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
 type MessageWithParts = {
@@ -9,6 +9,36 @@ type MessageWithParts = {
   role: string;
   content?: string | null;
   parts?: Array<unknown>;
+};
+
+type ScoreLeadToolPart = {
+  type: "tool-scoreLead";
+  toolCallId: string;
+  state: "input-streaming" | "input-available" | "output-available" | "output-error";
+  input?: {
+    teamSize?: string;
+    timeline?: string;
+    isDecisionMaker?: boolean;
+  };
+  output?: {
+    score?: number;
+    tier?: "hot" | "warm" | "cold";
+    reasoning?: string;
+  };
+  errorText?: string;
+};
+
+type SaveLeadToolPart = {
+  type: "tool-saveLead";
+  toolCallId: string;
+  state: "input-available" | "output-available" | "output-error";
+  input?: {
+    reason?: string;
+  };
+  output?: {
+    confirmed?: boolean;
+  };
+  errorText?: string;
 };
 
 function getMessageText(message: MessageWithParts | undefined) {
@@ -47,13 +77,51 @@ function getMessageText(message: MessageWithParts | undefined) {
   return "";
 }
 
+function ScoreCard({ score, tier, reasoning }: { score: number; tier: "hot" | "warm" | "cold"; reasoning: string }) {
+  const tierStyles = {
+    hot: {
+      badge: "border-cyan-400/40 bg-cyan-400/10 text-cyan-200",
+      panel: "border-cyan-400/30 bg-cyan-400/10",
+      label: "HOT",
+    },
+    warm: {
+      badge: "border-amber-400/40 bg-amber-400/10 text-amber-200",
+      panel: "border-amber-400/30 bg-amber-400/10",
+      label: "WARM",
+    },
+    cold: {
+      badge: "border-slate-400/40 bg-slate-400/10 text-slate-200",
+      panel: "border-slate-400/30 bg-slate-400/10",
+      label: "COLD",
+    },
+  } as const;
+
+  const selectedTier = tierStyles[tier];
+
+  return (
+    <div className={`rounded-2xl border p-3 ${selectedTier.panel}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Lead fit score</p>
+          <p className="mt-1 text-lg font-semibold text-white">{score}/100</p>
+        </div>
+        <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] ${selectedTier.badge}`}>
+          {selectedTier.label}
+        </span>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-slate-200">{reasoning}</p>
+    </div>
+  );
+}
+
 export function WidgetChat() {
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
   const [input, setInput] = useState("");
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
-  const { messages, status, stop, error, sendMessage } = useChat({
+  const { messages, status, stop, error, sendMessage, addToolResult } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
   });
 
   const latestAssistantMessage = [...messages].reverse().find((message) => message.role === "assistant");
@@ -177,6 +245,16 @@ export function WidgetChat() {
           {messages.map((message) => {
             const text = getMessageText(message);
             const isUser = message.role === "user";
+            const toolParts = Array.isArray(message.parts)
+              ? (message.parts.filter((part) => {
+                  if (typeof part !== "object" || part === null) {
+                    return false;
+                  }
+
+                  const candidate = part as { type?: unknown };
+                  return typeof candidate.type === "string" && (candidate.type === "tool-scoreLead" || candidate.type === "tool-saveLead");
+                }) as Array<ScoreLeadToolPart | SaveLeadToolPart>)
+              : [];
 
             return (
               <div key={message.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
@@ -187,7 +265,142 @@ export function WidgetChat() {
                       : "border border-slate-800 bg-slate-900/90 text-slate-100"
                   }`}
                 >
-                  <p className="whitespace-pre-wrap break-words">{text}</p>
+                  {text ? <p className="whitespace-pre-wrap break-words">{text}</p> : null}
+
+          {toolParts.length > 0 ? (
+            <div className={`space-y-3 ${text ? "mt-3" : "mt-0"}`}>
+              {(() => {
+                const seenToolCallIds = new Set<string>();
+                const hasSuccessfulScore = toolParts.some(
+                  (p) => typeof p === "object" && p !== null && (p as any).type === "tool-scoreLead" && (p as any).state === "output-available"
+                );
+
+                return toolParts.map((part) => {
+                  const toolCallId = (part as any).toolCallId as string | undefined;
+                  if (toolCallId && seenToolCallIds.has(toolCallId)) {
+                    return null;
+                  }
+
+                  if (toolCallId) {
+                    seenToolCallIds.add(toolCallId);
+                  }
+
+                  if (part.type === "tool-scoreLead") {
+                    const input = part.input;
+                    const output = part.output;
+                    const isInputState = part.state === "input-streaming" || part.state === "input-available";
+                    const isOutputState = part.state === "output-available";
+
+                    return (
+                      <div
+                        key={part.toolCallId}
+                        className={`min-h-[88px] rounded-2xl border border-slate-800/80 bg-slate-950/70 p-3 transition-opacity duration-200 ${
+                          isOutputState ? "opacity-100" : "opacity-90"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">
+                            {part.state === "input-streaming" ? "Pending" : "Scoring fit"}
+                          </span>
+                          <span className="text-xs text-slate-400">
+                            {part.state === "input-streaming" ? "Scoring your fit…" : "Locked-in qualification details"}
+                          </span>
+                        </div>
+
+                        {isInputState ? (
+                          <div className="mt-3 text-sm text-slate-200">
+                            {part.state === "input-streaming" ? (
+                              <p>No data yet.</p>
+                            ) : (
+                              <p>
+                                {input?.teamSize ?? "Unknown team size"} • {input?.timeline ?? "Unknown timeline"} • {input?.isDecisionMaker ? "Decision-maker" : "Not the decision-maker"}
+                              </p>
+                            )}
+                          </div>
+                        ) : null}
+
+                        {isOutputState && output ? (
+                          <div className="mt-3">
+                            <ScoreCard score={output.score ?? 0} tier={output.tier ?? "cold"} reasoning={output.reasoning ?? "Lead scoring is ready."} />
+                          </div>
+                        ) : null}
+
+                        {part.state === "output-error" ? (
+                          <div className="mt-3 rounded-2xl border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-200">
+                            We couldn’t complete the lead score right now. Please try again in a moment.
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  }
+
+                  if (part.type === "tool-saveLead") {
+                    const callId = part.toolCallId;
+
+                    if (part.state === "input-available") {
+                      // Only offer the save UI if a successful scoreLead result is present
+                      if (!hasSuccessfulScore) {
+                        return null;
+                      }
+
+                      return (
+                        <div key={callId} className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3">
+                          <p className="text-sm font-medium text-cyan-100">Save this lead for follow-up?</p>
+                          <div className="mt-3 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                addToolResult({
+                                  tool: "saveLead",
+                                  toolCallId: callId,
+                                  output: { confirmed: true },
+                                })
+                              }
+                              className="rounded-full bg-cyan-500 px-3 py-1.5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                addToolResult({
+                                  tool: "saveLead",
+                                  toolCallId: callId,
+                                  output: { confirmed: false },
+                                })
+                              }
+                              className="rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
+                            >
+                              Deny
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (part.state === "output-available") {
+                      return (
+                        <div key={callId} className="rounded-2xl border border-slate-700 bg-slate-950/70 p-3 text-sm text-slate-200">
+                          {part.output?.confirmed ? "Lead confirmed for follow-up." : "Lead save request cancelled."}
+                        </div>
+                      );
+                    }
+
+                    if (part.state === "output-error") {
+                      return (
+                        <div key={callId} className="rounded-2xl border border-rose-400/20 bg-rose-400/10 p-3 text-sm text-rose-200">
+                          We couldn’t confirm the lead save right now. Please try again.
+                        </div>
+                      );
+                    }
+                  }
+
+                  return null;
+                });
+              })()}
+            </div>
+          ) : null}
+
                 </div>
               </div>
             );
