@@ -35,8 +35,6 @@ export async function POST(request: Request) {
           description: "Score a lead based on team size, timeline, and decision-maker status.",
           inputSchema: scoreLeadInputSchema,
           execute: async (input) => {
-            // Temporary simulated failure for testing the UI error state.
-            throw new Error("Simulated failure for testing the error state");
 
             const scoredLead = scoreLead(input);
             const firestore = getAdminFirestore();

@@ -298,14 +298,16 @@ export function WidgetChat() {
                           isOutputState ? "opacity-100" : "opacity-90"
                         }`}
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">
-                            {part.state === "input-streaming" ? "Pending" : "Scoring fit"}
-                          </span>
-                          <span className="text-xs text-slate-400">
-                            {part.state === "input-streaming" ? "Scoring your fit…" : "Locked-in qualification details"}
-                          </span>
-                        </div>
+                        {isInputState ? (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center rounded-full border border-slate-700 bg-slate-900/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">
+                              {part.state === "input-streaming" ? "Pending" : "Scoring fit"}
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              {part.state === "input-streaming" ? "Scoring your fit…" : "Locked-in qualification details"}
+                            </span>
+                          </div>
+                        ) : null}
 
                         {isInputState ? (
                           <div className="mt-3 text-sm text-slate-200">
