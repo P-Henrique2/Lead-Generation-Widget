@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -51,6 +51,34 @@ describe("SettingsPage", () => {
     await user.click(screen.getByRole("button", { name: /save widget settings/i }));
 
     expect(screen.getByText(/at least one capture field must stay enabled/i)).toBeInTheDocument();
+  });
+
+  it("rejects titles that exceed the max length", async () => {
+    const user = userEvent.setup();
+    render(<SettingsPage />);
+
+    const titleInput = screen.getByLabelText(/widget title/i);
+    fireEvent.change(titleInput, { target: { value: "a".repeat(61) } });
+    await user.click(screen.getByRole("button", { name: /save widget settings/i }));
+
+    expect(screen.getByText("Title must be 60 characters or less")).toBeInTheDocument();
+    expect(titleInput).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("rejects hex colors with invalid formatting", async () => {
+    const user = userEvent.setup();
+    render(<SettingsPage />);
+
+    const titleInput = screen.getByLabelText(/widget title/i);
+    await user.type(titleInput, "Flowstate");
+
+    const accentInput = screen.getByLabelText(/accent color/i);
+    await user.clear(accentInput);
+    await user.type(accentInput, "blue");
+    await user.click(screen.getByRole("button", { name: /save widget settings/i }));
+
+    expect(screen.getByText("Enter a valid hex color, e.g. #06b6d4")).toBeInTheDocument();
+    expect(accentInput).toHaveAttribute("aria-invalid", "true");
   });
 
   it("submits successfully with valid values", async () => {

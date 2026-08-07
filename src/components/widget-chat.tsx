@@ -4,6 +4,8 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from "ai";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
+import { ScoreCard } from "./score-card";
+
 type MessageWithParts = {
   id: string;
   role: string;
@@ -77,41 +79,27 @@ function getMessageText(message: MessageWithParts | undefined) {
   return "";
 }
 
-function ScoreCard({ score, tier, reasoning }: { score: number; tier: "hot" | "warm" | "cold"; reasoning: string }) {
-  const tierStyles = {
-    hot: {
-      badge: "border-cyan-400/40 bg-cyan-400/10 text-cyan-200",
-      panel: "border-cyan-400/30 bg-cyan-400/10",
-      label: "HOT",
-    },
-    warm: {
-      badge: "border-amber-400/40 bg-amber-400/10 text-amber-200",
-      panel: "border-amber-400/30 bg-amber-400/10",
-      label: "WARM",
-    },
-    cold: {
-      badge: "border-slate-400/40 bg-slate-400/10 text-slate-200",
-      panel: "border-slate-400/30 bg-slate-400/10",
-      label: "COLD",
-    },
-  } as const;
+function isRateLimitError(error: unknown) {
+  const maybe = error as { statusCode?: number; status?: number; code?: string; message?: string };
 
-  const selectedTier = tierStyles[tier];
+  if ((maybe.statusCode ?? maybe.status) === 429) {
+    return true;
+  }
 
-  return (
-    <div className={`rounded-2xl border p-3 ${selectedTier.panel}`}>
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Lead fit score</p>
-          <p className="mt-1 text-lg font-semibold text-white">{score}/100</p>
-        </div>
-        <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] ${selectedTier.badge}`}>
-          {selectedTier.label}
-        </span>
-      </div>
-      <p className="mt-3 text-sm leading-6 text-slate-200">{reasoning}</p>
-    </div>
-  );
+  const text = [maybe.code, maybe.message].filter(Boolean).join(" ");
+  return /429|rate\s*limit|rate-limit|too many requests/i.test(text);
+}
+
+function getChatErrorLabel(error: Error | undefined) {
+  if (!error) {
+    return "We couldn’t complete that message right now. Try again in a moment.";
+  }
+
+  if (isRateLimitError(error)) {
+    return "Flowstate is getting a lot of requests — try again in a moment.";
+  }
+
+  return "We couldn’t complete that message right now. Check your connection and try again.";
 }
 
 export function WidgetChat() {
@@ -119,7 +107,10 @@ export function WidgetChat() {
   const isNearBottomRef = useRef(true);
   const [input, setInput] = useState("");
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
-  const { messages, status, stop, error, sendMessage, addToolResult } = useChat({
+  const [retrying, setRetrying] = useState(false);
+  const [lastFailedUserMessage, setLastFailedUserMessage] = useState<string | null>(null);
+  const [lastSentUserMessage, setLastSentUserMessage] = useState<string | null>(null);
+  const { messages, status, stop, error, sendMessage, addToolResult, clearError } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
   });
@@ -127,11 +118,28 @@ export function WidgetChat() {
   const latestAssistantMessage = [...messages].reverse().find((message) => message.role === "assistant");
   const latestAssistantText = getMessageText(latestAssistantMessage);
   const isStreaming = status === "submitted" || status === "streaming";
+  const isRequestPending = isStreaming;
   const latestMessage = messages[messages.length - 1];
   const isLatestMessageEmptyAssistant =
     latestMessage?.role === "assistant" && getMessageText(latestMessage).length === 0;
   const shouldShowThinking =
     isStreaming && (latestMessage?.role !== "assistant" || isLatestMessageEmptyAssistant);
+
+  useEffect(() => {
+    if (error && lastSentUserMessage) {
+      setLastFailedUserMessage(lastSentUserMessage);
+    }
+  }, [error, lastSentUserMessage]);
+
+  useEffect(() => {
+    if (!retrying) {
+      return;
+    }
+
+    if (status !== "submitted" && status !== "streaming") {
+      setRetrying(false);
+    }
+  }, [retrying, status]);
 
   const scrollToBottom = (smooth = false) => {
     const viewport = scrollViewportRef.current;
@@ -140,10 +148,15 @@ export function WidgetChat() {
       return;
     }
 
-    viewport.scrollTo({
-      top: viewport.scrollHeight,
-      behavior: smooth ? "smooth" : "auto",
-    });
+    if (typeof viewport.scrollTo === "function") {
+      viewport.scrollTo({
+        top: viewport.scrollHeight,
+        behavior: smooth ? "smooth" : "auto",
+      });
+      return;
+    }
+
+    viewport.scrollTop = viewport.scrollHeight;
   };
 
   useEffect(() => {
@@ -190,6 +203,17 @@ export function WidgetChat() {
   }, [messages, status]);
 
 
+  const sendUserMessage = (messageText: string) => {
+    if (!messageText) {
+      return;
+    }
+
+    setLastSentUserMessage(messageText);
+    setLastFailedUserMessage(null);
+    clearError?.();
+    void sendMessage({ text: messageText });
+  };
+
   const handleFormSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -201,7 +225,7 @@ export function WidgetChat() {
 
     setShowJumpToLatest(false);
     setInput("");
-    void sendMessage({ text: messageText });
+    sendUserMessage(messageText);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -216,7 +240,7 @@ export function WidgetChat() {
 
       setShowJumpToLatest(false);
       setInput("");
-      void sendMessage({ text: messageText });
+      sendUserMessage(messageText);
     }
   };
 
@@ -422,8 +446,34 @@ export function WidgetChat() {
           )}
 
           {error ? (
-            <div className="rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-200" role="alert">
-              {error.message}
+            <div className="rounded-3xl border border-rose-400/20 bg-rose-400/10 p-4 text-sm text-rose-200" role="alert">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-semibold text-white">Message failed</p>
+                  <p className="mt-1 text-sm text-rose-100">{getChatErrorLabel(error)}</p>
+                </div>
+
+                {lastFailedUserMessage ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (retrying || isRequestPending) {
+                        return;
+                      }
+
+                      setRetrying(true);
+                      clearError?.();
+                      setLastSentUserMessage(lastFailedUserMessage);
+                      setLastFailedUserMessage(null);
+                      void sendMessage({ text: lastFailedUserMessage });
+                    }}
+                    disabled={retrying || isRequestPending}
+                    className="inline-flex h-11 items-center justify-center rounded-2xl bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {retrying ? "Retrying…" : "Retry"}
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : null}
         </div>
