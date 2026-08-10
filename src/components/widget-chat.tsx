@@ -259,7 +259,7 @@ export function WidgetChat() {
       </header>
 
       <div ref={scrollViewportRef} className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-        <div className="mx-auto flex max-w-3xl flex-col gap-4">
+        <div aria-live="polite" aria-atomic="false" className="mx-auto flex max-w-3xl flex-col gap-4">
           {messages.length === 0 && (
             <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-sm leading-7 text-cyan-100">
               Start with a question about your team size, current workflow pain points, or your timeline and I’ll help qualify whether Flowstate is a fit.

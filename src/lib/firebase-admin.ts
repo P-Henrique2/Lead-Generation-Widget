@@ -35,7 +35,7 @@ export function getAdminFirestore() {
 export async function getLeadCount() {
   try {
     const firestore = getAdminFirestore();
-    const snapshot = await firestore.collection('leadsx').count().get();
+    const snapshot = await firestore.collection('leads').count().get();
     return snapshot.data().count;
   } catch (error) {
     console.warn('Firebase Admin is unavailable, falling back to 0:', error);
