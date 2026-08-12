@@ -6,8 +6,47 @@ import { MODEL_CONFIG, SYSTEM_PROMPT } from "../../../lib/ai/config";
 import { scoreLead, scoreLeadInputSchema } from "../../../lib/ai/lead-scoring";
 import { getAdminFirestore } from "../../../lib/firebase-admin";
 
+// Simple in-memory IP-based rate limiting (suitable for small, free-tier apps).
+// Note: this in-memory approach resets on serverless cold starts and is
+// not perfectly consistent across multiple instances — it's a low-cost
+// deterrent to reduce accidental or malicious quota exhaustion.
+const RATE_LIMIT_MAP = new Map<string, number[]>();
+// IP request limit per IP window — production default for a small demo app.
+const RATE_LIMIT_MAX = 10; // max requests
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // per 10 minutes
+
+function getIpFromRequest(req: Request) {
+  // Prefer X-Forwarded-For (may contain a comma list), then X-Real-IP.
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  const real = req.headers.get("x-real-ip");
+  if (real) return real;
+  // Fallback to a safe local identifier for dev environments.
+  return "unknown";
+}
+
+export const maxDuration = 30;
+
 export async function POST(request: Request) {
   try {
+    // IP-based rate limiting
+    const ip = getIpFromRequest(request);
+    const now = Date.now();
+    const windowStart = now - RATE_LIMIT_WINDOW_MS;
+    const previous = RATE_LIMIT_MAP.get(ip) ?? [];
+    const recent = previous.filter((ts) => ts > windowStart);
+    if (recent.length >= RATE_LIMIT_MAX) {
+      return new Response(
+        JSON.stringify({ status: 429, statusCode: 429, code: "rate_limit_exceeded", message: "Rate limit exceeded. Try again later." }),
+        {
+          status: 429,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+    recent.push(now);
+    RATE_LIMIT_MAP.set(ip, recent);
+
     const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
     if (!apiKey || typeof apiKey !== "string" || apiKey.trim().length === 0) {
