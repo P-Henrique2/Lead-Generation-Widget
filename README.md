@@ -35,7 +35,7 @@ See `SPEC.md` for the full spec and `claude.md` for project conventions.
 **Qualification chat with a live score card**
 ![score card](docs/screenshots/score-card.png)
 
-**Human-in-the-loop confirmation before saving a lead**
+**Human-in-the-loop confirmation saving a lead**
 ![save confirmation](docs/screenshots/save-lead-confirm.png)
 
 **Designed error state with retry, mid-stream failure**
@@ -44,7 +44,6 @@ See `SPEC.md` for the full spec and `claude.md` for project conventions.
 **Widget settings form with validation**
 ![settings form](docs/screenshots/settings-form.png)
 
-*(Add these four image files to `docs/screenshots/` in the repo.)*
 
 ## Run locally
 
