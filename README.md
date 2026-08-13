@@ -90,6 +90,22 @@ npx playwright test   # end-to-end test (requires a real API key)
   tool states, the settings form, the score card), one Playwright end-to-end test, CI via
   GitHub Actions on every push
 
+## Testing
+
+17 component/unit tests (Vitest + React Testing Library) across 4 test files:
+chat renderer (all tool part states), the settings form, and the score card
+component. Plus one Playwright end-to-end test covering the primary flow
+(send a message -> receive a streamed response).
+
+**Coverage:** 78.64% statements, 69.91% branches, 87.8% functions, 78.43% lines.
+
+Run locally:
+```bash
+npm run test              # unit/component tests
+npx vitest run --coverage # with coverage report
+npx playwright test       # end-to-end test
+```
+
 ## AI Tools
 
 ### scoreLead
