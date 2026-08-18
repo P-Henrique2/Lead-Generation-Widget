@@ -5,6 +5,10 @@ using Firebase/Firestore for data storage, developed with AI-assisted tooling (G
 
 **Live preview:** [LeadGenWidget](https://lead-geneapp.vercel.app/)
 
+## Project Brief
+
+Flowstate is a lead-qualification widget for small B2B teams who don't have the headcount to staff a live sales chat, but still want to filter website visitors before a human gets involved. Instead of a static intake form that treats every visitor the same regardless of what they actually say, visitors have a short conversation with an AI assistant that asks about team size, timeline, and decision-making authority, then scores the lead in real time using a deterministic scoring function, and asks for explicit confirmation before saving anything. I built this because I wanted to explore where conversational AI actually earns its place over a simpler UI pattern: not as a novelty, but specifically where the flexibility of natural language produces a better, more usable output, than a form ever could.
+
 ## About
 
 This repo documents both the built application and the AI-assisted development workflow
@@ -97,6 +101,7 @@ chat renderer (all tool part states), the settings form, and the score card
 component. Plus one Playwright end-to-end test covering the primary flow
 (send a message -> receive a streamed response).
 
+
 **Coverage:** 78.64% statements, 69.91% branches, 87.8% functions, 78.43% lines.
 
 Run locally:
@@ -105,6 +110,14 @@ npm run test              # unit/component tests
 npx vitest run --coverage # with coverage report
 npx playwright test       # end-to-end test
 ```
+## Accessibility
+
+targets WCAG 2.1 AA. Verified via Lighthouse (Accessibility: 100/100 on
+/widget) and WAVE (0 errors, 0 contrast errors, 0 alerts after fixing a redundant-link
+issue). Streamed AI responses are announced to screen readers via aria-live="polite".
+Full keyboard navigation confirmed on the primary flow, including the Stop button during
+active streaming and the tool confirmation buttons (Confirm/Deny). Not independently
+verified with a live screen reader session (VoiceOver/NVDA), noted as a known limitation.
 
 ## AI Tools
 
