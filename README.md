@@ -212,3 +212,19 @@ not just acceptance:
   instead on real Android (Chrome) and desktop Firefox + Chromium-based browsers.
 - Screen-reader announcement of streamed text (`aria-live="polite"`) was verified by code
   inspection, not a live screen-reader session (VoiceOver/NVDA).
+
+## Reflection
+
+"What was hardest? Why?"
+
+The hardest part was verifying and testing the code. Copilot could produce a working settings form, a working tool-calling integration, a working test suite, almost every time on the first pass. What consistently broke wasn't the first output, it was the second fix, the one applied on top of a working thing to solve a smaller problem. The tsconfig.json/Vitest JSX conflict is the clearest example: fixing the test runner broke the production build, fixing the build reverted the test fix, twice, before the actual root cause (two tools wanting different JSX transforms) was diagnosed instead of patched around. The pattern repeated in smaller ways, a settings-form regression from an incomplete cherry-pick, a --legacy-peer-deps install that silently deleted vite from node_modules. None of these were cases of AI writing bad code. They were cases of a fix being locally correct and globally wrong, and the only way to catch that was running the actual build and test commands myself.
+
+
+"What would you do differently next time?"
+
+I would commit more aggressively and immediately, before switching branches or context, the fe03/round-1/round-2 contamination early on happened purely because uncommitted files survived a branch checkout, which cost real time to untangle. I would also run npm run build and npm run test together as a single unit from the start, several bugs only existed in the gap between "Vitest is satisfied" and "Next's stricter compiler is satisfied," and treating those as one combined check instead of two separate ones would have surfaced problems a step earlier each time.
+
+
+"One thing you learned that surprised you"
+
+How much of "AI-assisted development" is actually about deciding what not to trust yet. The vague-vs-precise prompting drill made this concrete early on: the same feature request, worded loosely, produced a form that silently ignored the validation library sitting right there in package.json. That was the same failure mode showing up all week in smaller forms: a Copilot plan stating a file "already exists" when it didn't, a claimed fix that turned out to be an unverified assumption about Google's quota pooling. The surprising part wasn't that AI made mistakes, it's that the mistakes were almost always plausible-sounding rather than obviously wrong, which means the actual skill this project was training was building the habit of checking before believing.
